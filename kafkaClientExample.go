@@ -8,17 +8,19 @@ import (
 
 func main() {
 
+	// TODO: move to config files
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost",
 		"group.id":          "myGroup",
 		"auto.offset.reset": "earliest",
 	})
 
+	defer c.Close()
 	if err != nil {
 		panic(err)
 	}
 
-	c.SubscribeTopics([]string{"quickstart-events"}, nil)
+	c.SubscribeTopics([]string{"BTC-USD", "ETH-USD"}, nil)
 
 	for {
 		msg, err := c.ReadMessage(-1)
@@ -30,5 +32,4 @@ func main() {
 		}
 	}
 
-	c.Close()
 }

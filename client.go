@@ -4,6 +4,7 @@
 
 // +build ignore
 
+// TODO: use config files for symbols/topics/urls etc
 package main
 
 import (
@@ -67,29 +68,30 @@ func readMsg(c *websocket.Conn, p *kafka.Producer, done chan struct{}) {
 			return
 		}
 
-		// pass message to kafka
-		topic := "quickstart-events"
-		p.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Value:          []byte(message),
-		}, nil)
-
 		var dat map[string]interface{}
 		if err := json.Unmarshal(message, &dat); err != nil {
 			log.Println(err)
 		}
-		switch dat["channel"] {
-		case "heartbeat":
-			log.Println("<3")
-		case "ticker":
-			if dat["event"].(string) == "snapshot" {
-				symbol_str := dat["symbol"].(string)
-				price_str := strconv.FormatFloat(dat["price_24h"].(float64), 'f', -1, 64)
-				volume_str := strconv.FormatFloat(dat["volume_24h"].(float64), 'f', -1, 64)
-				str_slice := []string{symbol_str, price_str, volume_str}
 
-				log.Println(strings.Join(str_slice, ","))
-			}
+		// TODO: fix willy nilly type assertions
+		switch {
+		case dat["channel"] == "heartbeat":
+			log.Println("<3")
+		case dat["channel"] == "ticker" && dat["event"] == "snapshot":
+			symbol_str := dat["symbol"].(string)
+			price_str := strconv.FormatFloat(dat["price_24h"].(float64), 'f', -1, 64)
+			volume_str := strconv.FormatFloat(dat["volume_24h"].(float64), 'f', -1, 64)
+			str_slice := []string{symbol_str, price_str, volume_str}
+			log.Println(strings.Join(str_slice, ","))
+		case dat["channel"] == "prices" && dat["event"] == "updated":
+			// pass message to kafka
+			// topic := "quickstart-events"
+			topic := dat["symbol"].(string)
+			// log.Println(topic)
+			p.Produce(&kafka.Message{
+				TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+				Value:          []byte(message),
+			}, nil)
 		default:
 			log.Printf("recv: %s", message)
 
