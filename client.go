@@ -7,25 +7,21 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
-var addr = flag.String("addr", "ws.prod.blockchain.info", "http service address")
-
-func main() {
-	flag.Parse()
-	log.SetFlags(0)
-
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-
+func connect() *websocket.Conn {
+	var addr = flag.String("addr", "ws.prod.blockchain.info", "Blockchain Exchange")
 	u := url.URL{Scheme: "wss", Host: *addr, Path: "/mercury-gateway/v1/ws"}
 	log.Printf("connecting to %s", u.String())
 
@@ -36,42 +32,76 @@ func main() {
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
-	defer c.Close()
+	return c
+}
 
-	done := make(chan struct{})
+func subcribeHeartbeat(c *websocket.Conn) {
 	c.WriteMessage(websocket.TextMessage, []byte(`
 	{
 		"action": "subscribe",
 		"channel": "heartbeat"
 	  }
 	`))
-	c.WriteMessage(websocket.TextMessage, []byte(`
-	{
-		"action": "subscribe",
-		"channel": "ticker",
-		"symbol": "BTC-USD"
-	  }
-	`))
-	c.WriteMessage(websocket.TextMessage, []byte(`
-	{
-		"action": "subscribe",
-		"channel": "ticker",
-		"symbol": "ETH-USD"
-	  }
-	`))
+}
 
-	go func() {
-		defer close(done)
-		for {
-			_, message, err := c.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
-				return
-			}
-			log.Printf("recv: %s", message)
+func subscribeOHLCV(c *websocket.Conn, symbol string) {
+	c.WriteMessage(websocket.TextMessage, []byte(`
+	{
+		"action": "subscribe",
+		"channel": "prices",
+		"granularity": 60,
+		"symbol": "`+symbol+`"
+	  }
+	`))
+}
+
+func readMsg(c *websocket.Conn, done chan struct{}) {
+	defer close(done)
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println("read:", err)
+			return
 		}
-	}()
+		log.Printf("recv: %s", message)
+		var dat map[string]interface{}
+		if err := json.Unmarshal(message, &dat); err != nil {
+			log.Println(err)
+		}
+		switch dat["channel"] {
+		case "heartbeat":
+			log.Println("<3")
+		case "ticker":
+			if dat["event"].(string) == "snapshot" {
+				symbol_str := dat["symbol"].(string)
+				price_str := strconv.FormatFloat(dat["price_24h"].(float64), 'f', -1, 64)
+				volume_str := strconv.FormatFloat(dat["volume_24h"].(float64), 'f', -1, 64)
+				str_slice := []string{symbol_str, price_str, volume_str}
 
+				log.Println(strings.Join(str_slice, ","))
+			}
+		}
+	}
+}
+
+func main() {
+	flag.Parse()
+	log.SetFlags(0)
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+
+	c := connect()
+	defer c.Close()
+
+	done := make(chan struct{})
+	subcribeHeartbeat(c)
+	symbols := []string{"BTC-USD", "BTC-EUR", "ETH-USD", "ETH-EUR"}
+	for _, s := range symbols {
+		subscribeOHLCV(c, s)
+	}
+
+	go readMsg(c, done)
 	for {
 		select {
 		case <-done:
