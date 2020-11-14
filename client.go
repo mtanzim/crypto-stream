@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 func connect() *websocket.Conn {
@@ -55,7 +57,8 @@ func subscribeOHLCV(c *websocket.Conn, symbol string) {
 	`))
 }
 
-func readMsg(c *websocket.Conn, done chan struct{}) {
+// TODO: clean up
+func readMsg(c *websocket.Conn, p *kafka.Producer, done chan struct{}) {
 	defer close(done)
 	for {
 		_, message, err := c.ReadMessage()
@@ -63,6 +66,14 @@ func readMsg(c *websocket.Conn, done chan struct{}) {
 			log.Println("read:", err)
 			return
 		}
+
+		// pass message to kafka
+		topic := "quickstart-events"
+		p.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+			Value:          []byte(message),
+		}, nil)
+
 		var dat map[string]interface{}
 		if err := json.Unmarshal(message, &dat); err != nil {
 			log.Println(err)
@@ -86,6 +97,20 @@ func readMsg(c *websocket.Conn, done chan struct{}) {
 	}
 }
 
+// kafka delivery report handler
+func kafkaDeliveryReports(p *kafka.Producer) {
+	for e := range p.Events() {
+		switch ev := e.(type) {
+		case *kafka.Message:
+			if ev.TopicPartition.Error != nil {
+				fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
+			} else {
+				fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+			}
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	log.SetFlags(0)
@@ -96,6 +121,14 @@ func main() {
 	c := connect()
 	defer c.Close()
 
+	// connect kafka
+	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+	if err != nil {
+		log.Panicln(err)
+	}
+	go kafkaDeliveryReports(p)
+	defer p.Close()
+
 	done := make(chan struct{})
 	subcribeHeartbeat(c)
 	symbols := []string{"BTC-USD", "BTC-EUR", "ETH-USD", "ETH-EUR"}
@@ -103,7 +136,7 @@ func main() {
 		subscribeOHLCV(c, s)
 	}
 
-	go readMsg(c, done)
+	go readMsg(c, p, done)
 	for {
 		select {
 		case <-done:
