@@ -63,7 +63,6 @@ func readMsg(c *websocket.Conn, done chan struct{}) {
 			log.Println("read:", err)
 			return
 		}
-		log.Printf("recv: %s", message)
 		var dat map[string]interface{}
 		if err := json.Unmarshal(message, &dat); err != nil {
 			log.Println(err)
@@ -80,6 +79,9 @@ func readMsg(c *websocket.Conn, done chan struct{}) {
 
 				log.Println(strings.Join(str_slice, ","))
 			}
+		default:
+			log.Printf("recv: %s", message)
+
 		}
 	}
 }
