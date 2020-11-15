@@ -1,9 +1,3 @@
-// Copyright 2015 The Gorilla WebSocket Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// +build ignore
-
 package main
 
 import (
@@ -77,13 +71,63 @@ const EventValOHLCV = "updated"
 const OHLCVKey = "price"
 const SymbolKey = "symbol"
 
-// TODO: use this struct for unmarshalling
 type OHLCV struct {
-	seqnum  int
-	event   string
-	channel string
-	symbol  string
-	price   []float64
+	Seqnum  int       `json:"seqnum"`
+	Event   string    `json:"event"`
+	Channel string    `json:"channel"`
+	Symbol  string    `json:"symbol"`
+	Price   []float64 `json:"price"`
+}
+
+type OHLCVConverted struct {
+	Pair      string  `json:"pair"`
+	Timestamp float64 `json:"timestamp"`
+	Open      float64 `json:"open"`
+	High      float64 `json:"high"`
+	Low       float64 `json:"low"`
+	Close     float64 `json:"close"`
+	Volume    float64 `json:"volume"`
+}
+
+func (ohlcv OHLCV) reformat() ([]byte, *OHLCVConverted) {
+	converted := OHLCVConverted{
+		Pair: ohlcv.Symbol}
+
+	for i, v := range ohlcv.Price {
+		switch i {
+		case 0:
+			converted.Timestamp = v
+		case 1:
+			converted.Open = v
+		case 2:
+			converted.High = v
+		case 3:
+			converted.Low = v
+		case 4:
+			converted.Close = v
+		case 5:
+			converted.Volume = v
+		}
+	}
+	convertedJSON, err := json.Marshal(converted)
+	if err != nil {
+		log.Println(err)
+	}
+	return convertedJSON, &converted
+}
+
+func sendToKafka(p *kafka.Producer, message []byte) {
+	ohlcv := OHLCV{}
+	if err := json.Unmarshal(message, &ohlcv); err != nil {
+		log.Println(err)
+	}
+	convertedJSON, converted := ohlcv.reformat()
+	// pass message to kafka
+	topic := converted.Pair
+	p.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		Value:          convertedJSON,
+	}, nil)
 }
 
 // TODO: clean up
@@ -107,14 +151,8 @@ func readMsg(c *websocket.Conn, p *kafka.Producer, done chan struct{}) {
 		case dat[ChannelKey] == ChannelValHeartbeat:
 			log.Println("<3")
 		case dat[ChannelKey] == ChannelValPrices && dat[EventKey] == EventValOHLCV:
-			// pass message to kafka
-			// topic := "quickstart-events"
-			topic := dat[SymbolKey].(string)
-			// log.Println(topic)
-			p.Produce(&kafka.Message{
-				TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-				Value:          []byte(message),
-			}, nil)
+			sendToKafka(p, message)
+
 		}
 	}
 }
@@ -144,7 +182,8 @@ func main() {
 	defer c.Close()
 
 	// connect kafka
-	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+	kafkaServer := os.Getenv("KAFKA_SERVER_ADDR")
+	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": kafkaServer})
 	if err != nil {
 		log.Panicln(err)
 	}

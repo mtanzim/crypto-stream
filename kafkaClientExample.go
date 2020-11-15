@@ -1,17 +1,23 @@
+// +build ignore
 package main
 
 import (
 	"fmt"
+	"os"
 
+	_ "github.com/joho/godotenv/autoload"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 func main() {
 
 	// TODO: move to config files
+	kafkaServer := os.Getenv("KAFKA_SERVER_ADDR")
+	groupId := os.Getenv("KAFKA_GROUP_ID")
+
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost",
-		"group.id":          "myGroup",
+		"bootstrap.servers": kafkaServer,
+		"group.id":          groupId,
 		"auto.offset.reset": "earliest",
 	})
 

@@ -5,5 +5,6 @@ A simple Go project that receives a stream of cryptocurrency data from a websock
 ## Resources
 
 - https://github.com/confluentinc/confluent-kafka-go
+- https://kafka.apache.org/quickstart
 - https://github.com/gorilla/websocket
 - https://exchange.blockchain.com/api/#websocket-api
