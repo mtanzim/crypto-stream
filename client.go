@@ -4,7 +4,6 @@
 
 // +build ignore
 
-// TODO: use config files for symbols/topics/urls etc
 package main
 
 import (
@@ -16,20 +15,25 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/websocket"
+	_ "github.com/joho/godotenv/autoload"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 func connect() *websocket.Conn {
-	var addr = flag.String("addr", "ws.prod.blockchain.info", "Blockchain Exchange")
-	u := url.URL{Scheme: "wss", Host: *addr, Path: "/mercury-gateway/v1/ws"}
+	scheme := os.Getenv("WS_SCHEME")
+	wsAddr := os.Getenv("WS_ADDR")
+	path := os.Getenv("WS_PATH")
+	origin := os.Getenv("WS_ORIGIN_HEADER")
+
+	var addr = flag.String("addr", wsAddr, "Blockchain Exchange")
+	u := url.URL{Scheme: scheme, Host: *addr, Path: path}
 	log.Printf("connecting to %s", u.String())
 
 	header := http.Header{}
-	header.Set("origin", "https://exchange.blockchain.com")
+	header.Set("origin", origin)
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), header)
 	if err != nil {
@@ -38,24 +42,48 @@ func connect() *websocket.Conn {
 	return c
 }
 
+const HearbeatMsg = `
+{
+	"action": "subscribe",
+	"channel": "heartbeat"
+  }
+`
+
 func subcribeHeartbeat(c *websocket.Conn) {
-	c.WriteMessage(websocket.TextMessage, []byte(`
-	{
-		"action": "subscribe",
-		"channel": "heartbeat"
-	  }
-	`))
+	c.WriteMessage(websocket.TextMessage, []byte(HearbeatMsg))
 }
 
-func subscribeOHLCV(c *websocket.Conn, symbol string) {
-	c.WriteMessage(websocket.TextMessage, []byte(`
-	{
+func makeOHLCVMsg(pair string) string {
+	ohlcvStr :=
+		`{
 		"action": "subscribe",
 		"channel": "prices",
 		"granularity": 60,
-		"symbol": "`+symbol+`"
-	  }
-	`))
+		"symbol": "` + pair + `"
+	}`
+
+	return ohlcvStr
+}
+
+func subscribeOHLCV(c *websocket.Conn, pair string) {
+	c.WriteMessage(websocket.TextMessage, []byte(makeOHLCVMsg(pair)))
+}
+
+const ChannelKey = "channel"
+const ChannelValPrices = "prices"
+const ChannelValHeartbeat = "heartbeat"
+const EventKey = "event"
+const EventValOHLCV = "updated"
+const OHLCVKey = "price"
+const SymbolKey = "symbol"
+
+// TODO: use this struct for unmarshalling
+type OHLCV struct {
+	seqnum  int
+	event   string
+	channel string
+	symbol  string
+	price   []float64
 }
 
 // TODO: clean up
@@ -73,28 +101,20 @@ func readMsg(c *websocket.Conn, p *kafka.Producer, done chan struct{}) {
 			log.Println(err)
 		}
 
-		// TODO: fix willy nilly type assertions
+		log.Printf("recv: %s", message)
+
 		switch {
-		case dat["channel"] == "heartbeat":
+		case dat[ChannelKey] == ChannelValHeartbeat:
 			log.Println("<3")
-		case dat["channel"] == "ticker" && dat["event"] == "snapshot":
-			symbol_str := dat["symbol"].(string)
-			price_str := strconv.FormatFloat(dat["price_24h"].(float64), 'f', -1, 64)
-			volume_str := strconv.FormatFloat(dat["volume_24h"].(float64), 'f', -1, 64)
-			str_slice := []string{symbol_str, price_str, volume_str}
-			log.Println(strings.Join(str_slice, ","))
-		case dat["channel"] == "prices" && dat["event"] == "updated":
+		case dat[ChannelKey] == ChannelValPrices && dat[EventKey] == EventValOHLCV:
 			// pass message to kafka
 			// topic := "quickstart-events"
-			topic := dat["symbol"].(string)
+			topic := dat[SymbolKey].(string)
 			// log.Println(topic)
 			p.Produce(&kafka.Message{
 				TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 				Value:          []byte(message),
 			}, nil)
-		default:
-			log.Printf("recv: %s", message)
-
 		}
 	}
 }
@@ -133,9 +153,10 @@ func main() {
 
 	done := make(chan struct{})
 	subcribeHeartbeat(c)
-	symbols := []string{"BTC-USD", "BTC-EUR", "ETH-USD", "ETH-EUR"}
-	for _, s := range symbols {
-		subscribeOHLCV(c, s)
+	pairsEnv := os.Getenv("PAIRS")
+	pairs := strings.Split(pairsEnv, ",")
+	for _, pair := range pairs {
+		subscribeOHLCV(c, pair)
 	}
 
 	go readMsg(c, p, done)
