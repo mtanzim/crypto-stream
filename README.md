@@ -2,7 +2,7 @@
 
 A simple Go project that receives a stream of cryptocurrency data from a websocket api, and publishes them to a Kafka broker. The messages are then read by a node-js client.
 
-# To Do
+## To Do
 
 - [ ] Build a simple front-end
 - [ ] Containerize the application with Docker
