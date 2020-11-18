@@ -14,3 +14,5 @@ A simple Go project that receives a stream of cryptocurrency data from a websock
 - https://github.com/gorilla/websocket
 - https://exchange.blockchain.com/api/#websocket-api
 - https://www.npmjs.com/package/kafkajs
+- https://github.com/websockets/ws#simple-server
+- https://www.websocket.org/echo.html
