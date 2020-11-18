@@ -3,31 +3,25 @@ require("dotenv").config();
 const { Kafka } = require("kafkajs");
 const http = require("http");
 const WebSocket = require("ws");
+const crypto = require("crypto");
 
 const kafka = new Kafka({
   clientId: "my-app",
   brokers: ["localhost:9092"],
 });
 
+const subscriptions = new Map();
+const pairs = (process.env.PAIRS || "").split(",");
+const pairsSet = new Set(pairs);
 const port = process.env.PORT || 3004;
+
+// HTTP server
 const server = http.createServer();
 server.listen(port);
-
-const wss = new WebSocket.Server({ noServer: true });
-wss.on("connection", function connection(ws, request, client) {
-  ws.on("message", function message(msg) {
-    console.log(`Received message ${msg} from user ${client}`);
-    if (msg === "subscribe") {
-      ws.send("Subscribed");
-    }
-  });
-});
-
 // TODO: fix auth!!!
 const authenticate = (_request, cb) => {
   cb(null, "test");
 };
-
 server.on("upgrade", function upgrade(request, socket, head) {
   authenticate(request, (err, client) => {
     if (err || !client) {
@@ -42,9 +36,25 @@ server.on("upgrade", function upgrade(request, socket, head) {
   });
 });
 
+// Websocket server
+const wss = new WebSocket.Server({ noServer: true });
+wss.on("connection", function connection(ws, _request, _client) {
+  const clientId = crypto.randomBytes(16).toString("hex");
+  subscriptions.set(clientId, { pairs: new Set(), conn: ws });
+  ws.on("message", function message(msg) {
+    console.log(`Received message ${msg} from user ${clientId}`);
+    const [cmd, pair] = msg.split(",");
+    if (cmd === "subscribe" && pairsSet.has(pair)) {
+      const cur = subscriptions.get(clientId);
+      const update = { ...cur, pairs: new Set(cur.pairs.add(pair)) };
+      subscriptions.set(clientId, update);
+      ws.send(`${clientId} subscribed to ${pair}`);
+    }
+  });
+});
 
+// Kafka client
 const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID });
-
 const run = async (topics) => {
   await consumer.connect();
   await Promise.all(
@@ -54,19 +64,19 @@ const run = async (topics) => {
   );
 
   await consumer.run({
-    eachMessage: async ({ _topic, _partition, message }) => {
+    eachMessage: async ({ topic, _partition, message }) => {
       const value = JSON.parse(message.value.toString());
       console.log({
         value,
       });
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message.value.toString());
+      subscriptions.forEach((sub) => {
+        const { conn, pairs } = sub;
+        if (pairs.has(topic)) {
+          conn.send(message.value.toString());
         }
       });
     },
   });
 };
-
-const pairs = (process.env.PAIRS || "").split(",");
+// Main
 run(pairs).catch(console.error);

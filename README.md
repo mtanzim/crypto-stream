@@ -4,7 +4,6 @@ A simple Go project that receives a stream of cryptocurrency data from a websock
 
 ## To Do
 
-- [ ] Build a simple front-end
 - [ ] Containerize the application with Docker
 
 ## Resources
