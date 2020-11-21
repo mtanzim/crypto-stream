@@ -33,7 +33,7 @@ type OHLCVFilter struct {
 	Timestamp float64 `bson:"timestamp"`
 }
 
-func initMongo() (*mongo.Collection, func(), func()) {
+func initMongo() (*mongo.Collection, func()) {
 
 	uri := os.Getenv("MONGO_URI")
 	dbName := os.Getenv("MONGO_DB")
@@ -41,7 +41,7 @@ func initMongo() (*mongo.Collection, func(), func()) {
 
 	// connect to MongoDB
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 10*time.Second)
-	// defer cancel()
+	defer cancelCtx()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
@@ -63,7 +63,7 @@ func initMongo() (*mongo.Collection, func(), func()) {
 	}
 	collection.Indexes().CreateOne(ctx, idxModel)
 
-	return collection, cancelCtx, disconnectMongo
+	return collection, disconnectMongo
 }
 
 func persistInMongo(collection *mongo.Collection, dat *OHLCV) {
@@ -112,8 +112,7 @@ func main() {
 	}
 	c.SubscribeTopics(pairsSli, nil)
 
-	collection, cancelCtx, disconnectMongo := initMongo()
-	defer cancelCtx()
+	collection, disconnectMongo := initMongo()
 	defer disconnectMongo()
 
 	for {
@@ -125,7 +124,6 @@ func main() {
 				log.Println(err)
 			}
 			go persistInMongo(collection, &dat)
-
 		} else {
 			// The client will automatically try to recover from all errors.
 			fmt.Printf("Consumer error: %v (%v)\n", err, msg)
