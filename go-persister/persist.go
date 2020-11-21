@@ -61,6 +61,24 @@ func initMongo() (*mongo.Collection, func(), func()) {
 	return collection, cancelCtx, disconnectMongo
 }
 
+func persistInMongo(collection *mongo.Collection, dat *OHLCV) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// res, err := collection.InsertOne(ctx, dat)
+	rplcOpt := options.Replace()
+	rplcOpt.SetUpsert(true)
+
+	filter := OHLCVFilter{Timestamp: dat.Timestamp, Pair: dat.Pair}
+	fmt.Println(filter)
+
+	res, err := collection.ReplaceOne(ctx, filter, dat, rplcOpt)
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println("Updated ", res.ModifiedCount)
+	fmt.Println("Upserted ", res.UpsertedID)
+}
+
 func initKafka() *kafka.Consumer {
 	// connect to Kafka
 	kafkaServer := os.Getenv("KAFKA_SERVER_ADDR")
@@ -101,21 +119,8 @@ func main() {
 			if err := json.Unmarshal(msg.Value, &dat); err != nil {
 				log.Println(err)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			// res, err := collection.InsertOne(ctx, dat)
-			rplcOpt := options.Replace()
-			rplcOpt.SetUpsert(true)
+			go persistInMongo(collection, &dat)
 
-			filter := OHLCVFilter{Timestamp: dat.Timestamp, Pair: dat.Pair}
-			fmt.Println(filter)
-
-			res, err := collection.ReplaceOne(ctx, filter, dat, rplcOpt)
-			if err != nil {
-				log.Println(err)
-			}
-			fmt.Println("Updated ", res.ModifiedCount)
-			fmt.Println("Upserted ", res.UpsertedID)
 		} else {
 			// The client will automatically try to recover from all errors.
 			fmt.Printf("Consumer error: %v (%v)\n", err, msg)
