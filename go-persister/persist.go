@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,6 +26,11 @@ type OHLCV struct {
 	Low       float64            `bson:"low"`
 	Close     float64            `bson:"close"`
 	Volume    float64            `bson:"volume"`
+}
+
+type OHLCVFilter struct {
+	Pair      string  `bson:"pair"`
+	Timestamp float64 `bson:"timestamp"`
 }
 
 func main() {
@@ -61,6 +67,14 @@ func main() {
 	}()
 	db := client.Database("crypto-streams")
 	collection := db.Collection("ohlcv")
+	idxModel := mongo.IndexModel{
+		Keys: bson.M{
+			"pair":      1,
+			"timestamp": 1,
+		},
+		Options: options.Index().SetUnique(true),
+	}
+	collection.Indexes().CreateOne(ctx, idxModel)
 
 	pairs := os.Getenv("PAIRS")
 	pairsSli := strings.Split(pairs, ",")
@@ -79,11 +93,19 @@ func main() {
 			}
 			ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			res, err := collection.InsertOne(ctx, dat)
+			// res, err := collection.InsertOne(ctx, dat)
+			rplcOpt := options.Replace()
+			rplcOpt.SetUpsert(true)
+
+			filter := OHLCVFilter{Timestamp: dat.Timestamp, Pair: dat.Pair}
+			fmt.Println(filter)
+
+			res, err := collection.ReplaceOne(ctx, filter, dat, rplcOpt)
 			if err != nil {
 				log.Println(err)
 			}
-			fmt.Println("inserted ", res.InsertedID)
+			fmt.Println("Updated ", res.ModifiedCount)
+			fmt.Println("Upserted ", res.UpsertedID)
 		} else {
 			// The client will automatically try to recover from all errors.
 			fmt.Printf("Consumer error: %v (%v)\n", err, msg)
