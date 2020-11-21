@@ -34,11 +34,16 @@ type OHLCVFilter struct {
 }
 
 func initMongo() (*mongo.Collection, func(), func()) {
+
+	uri := os.Getenv("MONGO_URI")
+	dbName := os.Getenv("MONGO_DB")
+	collName := os.Getenv("MONGO_COLL")
+
 	// connect to MongoDB
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 10*time.Second)
 	// defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -47,8 +52,8 @@ func initMongo() (*mongo.Collection, func(), func()) {
 			log.Panicln(err)
 		}
 	}
-	db := client.Database("crypto-streams")
-	collection := db.Collection("ohlcv")
+	db := client.Database(dbName)
+	collection := db.Collection(collName)
 	idxModel := mongo.IndexModel{
 		Keys: bson.M{
 			"pair":      1,
