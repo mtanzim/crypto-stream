@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -74,14 +73,14 @@ func persistInMongo(collection *mongo.Collection, dat *OHLCV) {
 	rplcOpt.SetUpsert(true)
 
 	filter := OHLCVFilter{Timestamp: dat.Timestamp, Pair: dat.Pair}
-	fmt.Println(filter)
+	log.Println(filter)
 
 	res, err := collection.ReplaceOne(ctx, filter, dat, rplcOpt)
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println("Updated ", res.ModifiedCount)
-	fmt.Println("Upserted ", res.UpsertedID)
+	log.Println("Updated ", res.ModifiedCount)
+	log.Println("Upserted ", res.UpsertedID)
 }
 
 func initKafka() *kafka.Consumer {
@@ -118,7 +117,7 @@ func main() {
 	for {
 		msg, err := c.ReadMessage(-1)
 		if err == nil {
-			fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+			log.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
 			var dat OHLCV
 			if err := json.Unmarshal(msg.Value, &dat); err != nil {
 				log.Println(err)
@@ -126,7 +125,7 @@ func main() {
 			go persistInMongo(collection, &dat)
 		} else {
 			// The client will automatically try to recover from all errors.
-			fmt.Printf("Consumer error: %v (%v)\n", err, msg)
+			log.Printf("Consumer error: %v (%v)\n", err, msg)
 		}
 	}
 
