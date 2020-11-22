@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -124,10 +123,14 @@ func sendToKafka(p *kafka.Producer, message []byte) {
 	convertedJSON, converted := ohlcv.reformat()
 	// pass message to kafka
 	topic := converted.Pair
-	p.Produce(&kafka.Message{
+	err := p.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 		Value:          convertedJSON,
 	}, nil)
+	if err != nil {
+		log.Panicln(err)
+	}
+
 }
 
 // TODO: clean up
@@ -163,10 +166,12 @@ func kafkaDeliveryReports(p *kafka.Producer) {
 		switch ev := e.(type) {
 		case *kafka.Message:
 			if ev.TopicPartition.Error != nil {
-				fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
+				log.Printf("Delivery failed: %v\n", ev.TopicPartition)
 			} else {
-				fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+				log.Printf("Delivered message to %v\n", ev.TopicPartition)
 			}
+		default:
+			log.Println(ev)
 		}
 	}
 }
@@ -185,7 +190,7 @@ func main() {
 	kafkaServer := os.Getenv("KAFKA_SERVER_ADDR")
 	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": kafkaServer})
 	if err != nil {
-		log.Panicln(err)
+		log.Fatalln(err)
 	}
 	go kafkaDeliveryReports(p)
 	defer p.Close()
