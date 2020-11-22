@@ -1,7 +1,8 @@
-FROM golang:1.7-alpine
+FROM golang:latest
 
-ADD . /go/src/app
-        
 WORKDIR /go/src/app
+COPY . .
 
-CMD ["go","run","publish.go"]
+RUN go get ./...
+RUN go build -o publish
+CMD ["./publish"]
