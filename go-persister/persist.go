@@ -68,7 +68,6 @@ func initMongo() (*mongo.Collection, func()) {
 func persistInMongo(collection *mongo.Collection, dat *OHLCV) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	// res, err := collection.InsertOne(ctx, dat)
 	rplcOpt := options.Replace()
 	rplcOpt.SetUpsert(true)
 

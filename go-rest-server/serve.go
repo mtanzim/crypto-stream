@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -38,23 +39,31 @@ func (h Handlers) getData(w http.ResponseWriter, r *http.Request) {
 
 	params := mux.Vars(r)
 	pair := params["pair"]
-	// from := params["from"]
-	// to := params["to"]
+	from, err := strconv.ParseFloat(params["from"], 64)
+	if err != nil {
+		http.Error(w, "Cannot get data", http.StatusInternalServerError)
+		return
+	}
+	to, err := strconv.ParseFloat(params["to"], 64)
+	if err != nil {
+		http.Error(w, "Cannot get data", http.StatusInternalServerError)
+		return
+	}
 
 	log.Println(params)
 
 	opts := options.Find()
 	opts.SetSort(bson.D{{"timestamp", -1}})
 	var dat []bson.M
-	// cursor, err := h.collection.Find(ctx, bson.M{"pair": bson.D{{"$eq", pair}}, "timestamp": bson.D{{"$gt", from}, {"$lt", to}}})
-	cursor, err := h.collection.Find(ctx, bson.M{"pair": bson.D{{"$eq", pair}}}, opts)
+	cursor, err := h.collection.Find(ctx, bson.M{"pair": pair, "timestamp": bson.M{"$gte": from, "$lte": to}}, opts)
 	if err = cursor.All(ctx, &dat); err != nil {
-		panic(err)
+		http.Error(w, "Cannot get data", http.StatusInternalServerError)
+		return
 	}
-	if err != nil {
-		log.Panicln(err)
+
+	if dat == nil {
+		json.NewEncoder(w).Encode(make([]bool, 0))
 	} else {
-		// log.Println(dat)
 		json.NewEncoder(w).Encode(dat)
 	}
 
