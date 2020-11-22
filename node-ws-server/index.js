@@ -5,9 +5,11 @@ const http = require("http");
 const WebSocket = require("ws");
 const crypto = require("crypto");
 
+const brokers = (process.env.KAFKA_BROKERS || "").split(",");
+
 const kafka = new Kafka({
   clientId: "my-app",
-  brokers: ["localhost:9092"],
+  brokers,
 });
 
 const subscriptions = new Map();
