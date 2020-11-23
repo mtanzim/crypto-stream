@@ -1,13 +1,13 @@
 # crypto-streams
 
-A simple Go project that receives a stream of cryptocurrency data from a websocket api, and publishes them to a Kafka broker. The messages are then read by a set of clients.
+A Go/Node project that receives a stream of cryptocurrency data from an external websocket api, and publishes them to a Kafka broker. The messages are then subscribed to by a set of clients.
 
 ## Components
 
-- [x] A stream producer in Go: subscribes to an external WS stream, and publishes it to a Kafka broker
-- [x] A web socket server in node: subscribes to the Kafka stream, and streams it through a websocket connection
-- [x] A persister in Go: subscribes to the Kafka stream, and stores the data in MongoDB
-- [x] A REST API server in Go: queries the MongoDB and allows access to its data through REST
+- [x] A stream producer in Go: subscribes to an external WS stream, reformats it, and publishes it to a Kafka broker
+- [x] A web socket server in Node: subscribes to the Kafka stream, and serves the stream through a websocket connection
+- [x] A persister in Go: subscribes to the Kafka stream, and persists the data in MongoDB
+- [x] A REST API server in Go: queries the MongoDB and allows access to its data through a REST API
 
 ## To Do
 
@@ -96,57 +96,17 @@ A simple Go project that receives a stream of cryptocurrency data from a websock
     "pair": "BTC-EUR",
     "timestamp": 1606165140000,
     "volume": 0.04699165
-  },
-  {
-    "_id": "5fbc22815dd4eb1fefa260bb",
-    "close": 15551.845,
-    "high": 15556.825,
-    "low": 15543.705,
-    "open": 15548.26,
-    "pair": "BTC-EUR",
-    "timestamp": 1606165080000,
-    "volume": 0.00051
-  },
-  {
-    "_id": "5fbc21e3f083b60f5d2ac2cb",
-    "close": 15561.095,
-    "high": 15564.89,
-    "low": 15548.2,
-    "open": 15548.2,
-    "pair": "BTC-EUR",
-    "timestamp": 1606164960000,
-    "volume": 0.01209971
-  },
-  {
-    "_id": "5fbc21e3f083b60f5d2ac29f",
-    "close": 15548.2,
-    "high": 15558.92,
-    "low": 15547.19,
-    "open": 15554.145,
-    "pair": "BTC-EUR",
-    "timestamp": 1606164900000,
-    "volume": 0
-  },
-  {
-    "_id": "5fbc2169de3a3e4de406a486",
-    "close": 15552.595,
-    "high": 15554.23,
-    "low": 15545.595,
-    "open": 15546.59,
-    "pair": "BTC-EUR",
-    "timestamp": 1606164840000,
-    "volume": 0
   }
 ]
 ```
 
 ## Resources
 
+- https://exchange.blockchain.com/api/#websocket-api
 - https://github.com/confluentinc/confluent-kafka-go
 - https://kafka.apache.org/quickstart
-- https://github.com/gorilla/websocket
-- https://exchange.blockchain.com/api/#websocket-api
 - https://www.npmjs.com/package/kafkajs
+- https://github.com/gorilla/websocket
 - https://github.com/websockets/ws#simple-server
-- https://www.websocket.org/echo.html
 - https://github.com/bitnami/bitnami-docker-kafka/blob/master/README.md
+- https://www.websocket.org/echo.html
