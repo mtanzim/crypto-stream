@@ -72,7 +72,6 @@ func persistInMongo(collection *mongo.Collection, dat *OHLCV) {
 	rplcOpt.SetUpsert(true)
 
 	filter := OHLCVFilter{Timestamp: dat.Timestamp, Pair: dat.Pair}
-	log.Println(filter)
 
 	res, err := collection.ReplaceOne(ctx, filter, dat, rplcOpt)
 	if err != nil {

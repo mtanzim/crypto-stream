@@ -20,7 +20,16 @@ services:
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
     depends_on:
       - zookeeper
+  mongo:
+    image: mongo:latest
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: crypto-streams
   producer:
     build: ./go-stream-producer
     depends_on:
-      - kafka
+      - kafka  
+  persister:
+    build: ./go-persister
+    depends_on:
+      - mongo
