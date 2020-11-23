@@ -32,4 +32,10 @@ services:
   persister:
     build: ./go-persister
     depends_on:
+      - mongo  
+  rest-server:
+    build: ./go-rest-server
+    depends_on:
       - mongo
+    ports:
+      - "8080:8080"
