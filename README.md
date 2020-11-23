@@ -1,6 +1,6 @@
 # crypto-streams
 
-A Go/Node project that receives a stream of cryptocurrency data from an external websocket api, and publishes them to a Kafka broker. The messages are then subscribed to by a set of clients.
+A Go/Node project that receives a stream of cryptocurrency data from an external websocket api, and publishes them to a Kafka broker. The messages are then subscribed to by a set of clients. The services are connected using Docker.
 
 ## Components
 
