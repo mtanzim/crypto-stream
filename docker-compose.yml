@@ -28,20 +28,45 @@ services:
   producer:
     build: ./go-stream-producer
     depends_on:
-      - kafka  
+      - kafka
+    environment:
+      - WS_SCHEME=${WS_SCHEME}
+      - WS_ADDR=${WS_ADDR}
+      - WS_PATH=${WS_PATH}
+      - WS_ORIGIN_HEADER=${WS_ORIGIN_HEADER}
+      - PAIRS=${PAIRS}
+      - KAFKA_SERVER_ADDR=${KAFKA_SERVER_ADDR}
   persister:
     build: ./go-persister
     depends_on:
-      - mongo  
+      - mongo
+    environment:
+      - PAIRS=${PAIRS}
+      - KAFKA_SERVER_ADDR=${KAFKA_SERVER_ADDR}
+      - KAFKA_GROUP_ID=${KAFKA_GROUP_ID_PERSISTER}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - MONGO_COLL=${MONGO_COLL}
   rest-server:
     build: ./go-rest-server
     depends_on:
       - mongo
     ports:
-      - "8080:8080"
+      - "${REST_PORT}:${REST_PORT}"
+    environment:
+      - PORT=${REST_PORT}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - MONGO_COLL=${MONGO_COLL}
   ws-server:
     build: ./node-ws-server
     depends_on:
-      - kafka 
+      - kafka
     ports:
-      - "3004:3004"  
+      - "${WS_PORT}:${WS_PORT}"
+    environment:
+      - KAFKA_SERVER_ADDR=${KAFKA_SERVER_ADDR}
+      - KAFKA_GROUP_ID=${KAFKA_GROUP_ID_WS}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - PAIRS=${PAIRS}
+      - PORT=${WS_PORT}
