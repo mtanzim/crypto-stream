@@ -9,11 +9,6 @@ A Go/Node project that receives a stream of cryptocurrency data from an external
 - [x] A persister in Go: subscribes to the Kafka stream, and persists the data in MongoDB
 - [x] A REST API server in Go: queries the MongoDB and allows access to its data through a REST API
 
-## To Do
-
-- [x] Containerize the application with Docker
-- [ ] Move `.env` config to `docker-compose.yml`
-
 ## Note
 
 - Configure the pairs through `.env` files
